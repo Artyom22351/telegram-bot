@@ -12,10 +12,7 @@ from datetime import datetime
 import subprocess
 
 API_TOKEN = "7778680385:AAGVJpeP0ErASOJeYwDbt6Smjmhbm8cUlpU"
-GRANT_SCRIPT = "./grant_priv.py"
-DB_PATH = "orders.db"
-MONO_CARD = "4441 1110 1806 7706"
-PRIVAT_CARD = "5168 7451 9690 9789"
+ADMIN_ID = 1106624152  # Id админа для уведомлений
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(API_TOKEN)
@@ -30,22 +27,18 @@ class Form(StatesGroup):
     selected_term = State()
     waiting_payment_screenshot = State()  # новое состояние для скриншота
 
-# Привилегии с флагами
 PRIVILEGES = {
-    "VIP": {"7 днів": 50, "1 місяць": 100, "Назавжди": 200, "flag": "ADMIN_LEVEL_H"},
-    "Osiris": {"7 днів": 150, "1 місяць": 300, "Назавжди": 400, "flag": "ADMIN_LEVEL_G"},
-    "Zeus": {"7 днів": 500, "1 місяць": 1000, "Назавжди": 1200, "flag": "ADMIN_LEVEL_E"},
-    "Odin": {"7 днів": 450, "1 місяць": 700, "Назавжди": 1400, "flag": "ADMIN_LEVEL_D"},
-    "Thor": {"7 днів": 550, "1 місяць": 1100, "Назавжди": 2200, "flag": "ADMIN_LEVEL_C"},
-    "Anubis": {"7 днів": 1200, "1 місяць": 2200, "Назавжди": 4400, "flag": "ADMIN_LEVEL_F"},
-    "Creator": {"Назавжди": 6000, "flag": "ADMIN_RESERVATION"}
+    "VIP": {"7 днів": 50, "1 місяць": 100, "Назавжди": 200},
+    "Osiris": {"7 днів": 150, "1 місяць": 300, "Назавжди": 400},
+    "Zeus": {"7 днів": 500, "1 місяць": 1000, "Назавжди": 1200},
+    "Odin": {"7 днів": 450, "1 місяць": 700, "Назавжди": 1400},
+    "Thor": {"7 днів": 550, "1 місяць": 1100, "Назавжди": 2200},
+    "Anubis": {"7 днів": 1200, "1 місяць": 2200, "Назавжди": 4400},
+    "Создатель": {"Назавжди": 6000}
 }
 
-# ID администраторов (включаем ваш ID)
-ADMIN_IDS = [1106624152]  # Ваш ID администратора
-
 async def init_db():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect("orders.db") as db:
         await db.execute("""
         CREATE TABLE IF NOT EXISTS orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,9 +68,8 @@ async def select_category(callback: types.CallbackQuery, state: FSMContext):
     kb = types.InlineKeyboardMarkup(row_width=1)
     terms = PRIVILEGES[category].keys()
     for term in terms:
-        if term != 'flag':  # Пропускаем флаг
-            price = PRIVILEGES[category][term]
-            kb.add(types.InlineKeyboardButton(f"{term} — {price} UAH", callback_data=f"select_term:{category}|{term}"))
+        price = PRIVILEGES[category][term]
+        kb.add(types.InlineKeyboardButton(f"{term} — {price} UAH", callback_data=f"select_term:{category}|{term}"))
     await callback.message.answer(f"🔸 Обери термін дії привілеї <b>{category}</b>:", parse_mode="HTML", reply_markup=kb)
     await state.update_data(selected_category=category)
 
@@ -101,7 +93,7 @@ async def select_term(callback: types.CallbackQuery, state: FSMContext):
 async def pay_mono(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     await callback.message.answer(
-        f"💳 Оплата через Monobank\n\nПривілея: <b>{data['selected_category']}</b>\nТермін: <b>{data['selected_term']}</b>\nСума: <b>{data['selected_price']} UAH</b>\n➡️ Номер карти: <code>{MONO_CARD}</code>\nПісля оплати надішли сюди скріншот.",
+        f"💳 Оплата через Monobank\n\nПривілея: <b>{data['selected_category']}</b>\nТермін: <b>{data['selected_term']}</b>\nСума: <b>{data['selected_price']} UAH</b>\n➡️ Номер карти: <code>4441 1110 1806 7706</code>\nПісля оплати надішли сюди скріншот.",
         parse_mode="HTML"
     )
     await Form.waiting_payment_screenshot.set()  # Перехід в стан очікування скриншота
@@ -110,7 +102,7 @@ async def pay_mono(callback: types.CallbackQuery, state: FSMContext):
 async def pay_privat(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     await callback.message.answer(
-        f"💳 Оплата через PrivatBank\n\nПривілея: <b>{data['selected_category']}</b>\nТермін: <b>{data['selected_term']}</b>\nСума: <b>{data['selected_price']} UAH</b>\n➡️ Номер карти: <code>{PRIVAT_CARD}</code>\nПісля оплати надішли сюди скріншот.",
+        f"💳 Оплата через PrivatBank\n\nПривілея: <b>{data['selected_category']}</b>\nТермін: <b>{data['selected_term']}</b>\nСума: <b>{data['selected_price']} UAH</b>\n➡️ Номер карти: <code>5168 7451 9690 9789</code>\nПісля оплати надішли сюди скріншот.",
         parse_mode="HTML"
     )
     await Form.waiting_payment_screenshot.set()  # Перехід в стан ожидания скриншота
@@ -124,37 +116,29 @@ async def handle_screenshot(message: types.Message, state: FSMContext):
 
     # Скачиваем фото
     photo = await bot.download_file(file_path)
-    photo_bytes = photo.read()  # Конвертируем в bytes
-    
-    # Путь для сохранения
     photo_path = f"payment_screenshots/{file_id}.jpg"
     
     os.makedirs(os.path.dirname(photo_path), exist_ok=True)
     with open(photo_path, "wb") as f:
-        f.write(photo_bytes)  # Пишем в файл как bytes
+        f.write(photo)
 
     # Сохраняем информацию в базу данных или отправляем админу для проверки
     data = await state.get_data()
 
-    # Отправляем уведомление администратору
-    for admin_id in ADMIN_IDS:
-        flag = PRIVILEGES[data['selected_category']].get("flag", "Unknown flag")
-        await bot.send_message(
-            admin_id,
-            f"🔔 Новый скриншот оплаты!\n\n"
-            f"Пользователь: @{message.from_user.username} ({message.from_user.id})\n"
-            f"Привилегия: {data['selected_category']}\n"
-            f"Термін: {data['selected_term']}\n"
-            f"Сума: {data['selected_price']} UAH\n"
-            f"Флаг привилегии: {flag}\n\n"
-            f"Скріншот оплати:\n"
-        )
-        # Отправка самого скрина
-        await bot.send_photo(admin_id, photo)
+    # Отправляем скриншот админу
+    await bot.send_photo(ADMIN_ID, photo, caption="Платіжний скріншот на перевірку")
 
-    # Отправляем пользователю подтверждение
+    # Отправляем уведомление пользователю
     await message.answer(f"✅ Скріншот оплати отримано! Чекайте на підтвердження.")
-
+    
+    # Уведомление админу
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        types.InlineKeyboardButton("✅ Схвалено", callback_data="approve_payment"),
+        types.InlineKeyboardButton("❌ Відхилено", callback_data="reject_payment")
+    )
+    await bot.send_message(ADMIN_ID, "Нове замовлення на перевірку!", reply_markup=kb)
+    
     await state.finish()
 
 if __name__ == "__main__":
