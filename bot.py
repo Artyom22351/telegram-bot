@@ -11,8 +11,8 @@ import aiosqlite
 from datetime import datetime
 import subprocess
 
-API_TOKEN = "7778680385:AAGVJpeP0ErASOJeYwDbt6Smjmhbm8cUlpU"
-ADMIN_ID = 1106624152  # Id админа для уведомлений
+API_TOKEN = ""
+ADMIN_ID =   # Id админа для уведомлений
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(API_TOKEN)
@@ -144,3 +144,4 @@ async def handle_screenshot(message: types.Message, state: FSMContext):
 if __name__ == "__main__":
     asyncio.get_event_loop().run_until_complete(init_db())
     executor.start_polling(dp, skip_updates=True)
+
